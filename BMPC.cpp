@@ -49,6 +49,7 @@ int main()
  
 	bool drag = false;
 	int dragX,dragY;
+	bool pressed=false;
 	
 //	for (int y=0; y<sprite_size.y; y++){
 //		for (int x=0; x<sprite_size.x; x++){
@@ -79,7 +80,34 @@ int main()
 					d /= zoom_factor;
 				}
 				
+				// I spend 4+ hours on this code, just to make the UI more user frendly, i hate algorithms especially when they dont work
+				float scale2 = circuit_sprite.getScale().x;
 				circuit_sprite.setScale(sf::Vector2f(d,d));
+				float scale = circuit_sprite.getScale().x;
+				
+				float ax = sf::Mouse::getPosition(window).x;
+				float ay = sf::Mouse::getPosition(window).y;
+				float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
+				float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
+				float bx = ax-cx;  float by = ay-cy;
+				float rx = bx/scale;  float ry = by/scale;
+				
+				float cx2 = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale2;
+				float cy2 = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale2;
+				float bx2 = ax-cx2;  float by2 = ay-cy2;
+				float rx2 = bx2/scale2;  float ry2 = by2/scale2;
+				
+				if (event.mouseWheelScroll.delta>0){
+					circuit_sprite.setOrigin(
+						(rx+circuit_sprite.getOrigin().x)/2,
+						(ry+circuit_sprite.getOrigin().y)/2
+					);
+				}else{
+					circuit_sprite.setOrigin(
+						(3*circuit_sprite.getOrigin().x - rx2)/2,
+						(3*circuit_sprite.getOrigin().y - ry2)/2
+					);
+				}
 			}
 			
 			if (event.type == sf::Event::MouseButtonPressed){
@@ -89,6 +117,9 @@ int main()
 						dragY = circuit_sprite.getPosition().y - sf::Mouse::getPosition().y;
 					}
 					drag = true;
+				}
+				if (event.mouseButton.button==0){
+					pressed=true;
 				}
 			}
 			if (event.type == sf::Event::MouseButtonReleased){
@@ -106,13 +137,26 @@ int main()
 					circuit_sprite.setOrigin(cx/bx*ox, cy/by*oy);
 					circuit_sprite.setPosition(width/2, height/2);
 				}
+				if (event.mouseButton.button==0){
+					pressed=false;
+				}
 			}
-			
 			if (drag){
 				circuit_sprite.setPosition(
 					sf::Mouse::getPosition().x+dragX,
 					sf::Mouse::getPosition().y+dragY
 				);
+			}
+			if (pressed){
+				float scale = circuit_sprite.getScale().x;
+				float ax = sf::Mouse::getPosition(window).x;
+				float ay = sf::Mouse::getPosition(window).y;
+				float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
+				float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
+				float bx = ax-cx;  float by = ay-cy;
+				float rx = bx/scale;  float ry = by/scale;
+				
+				raw_circuit.setPixel(rx,ry,sf::Color::Red);
 			}
 		}
 
