@@ -41,37 +41,47 @@ vector<vector<int>> circuit_details;
 
 int wire_index = 10;
 int gate_index = 50;
+int cross_index = 150;
 
-void fill_gate(int x, int y){
+void fill_box(int x, int y, int& with){
 	for (int vy=y-1; vy<=y+1; vy++){
 		for (int vx=x-1; vx<=x+1; vx++){
 			if (circuit_details[vx][vy]==1){
-				circuit_details[vx][vy]=gate_index;
+				circuit_details[vx][vy]=with;
 			}
 		}
 	}
-	gate_index++;
+	with++;
 }
 void search_for_gate(int x, int y){
 	auto z = circuit_details;
 	int a = z[x-1][y-1], b = z[x][y-1], c = z[x+1][y-1];
 	int d = z[x-1][y],   e = z[x][y],   f = z[x+1][y];
 	int g = z[x-1][y+1], h = z[x][y+1], i = z[x+1][y+1];
-	if (a==e && e==c && b==d && d==f && f==g && g==h && h==i && a==0){
+	if (a==e && e==c && b==d && d==f && f==g && g==h && h==i && e==0){
 		//cout << "Up" << endl;
-		fill_gate(x,y);
+		fill_box(x,y,gate_index);
 	}
 	if (c==e && e==i && a==b && b==d && d==f && f==g && g==h && e==0){
 		//cout << "Right" << endl;
-		fill_gate(x,y);
+		fill_box(x,y,gate_index);
 	}
 	if (a==b && b==c && c==d && d==f && f==h && e==g && g==i && e==0){
 		//cout << "Down" << endl;
-		fill_gate(x,y);
+		fill_box(x,y,gate_index);
 	}
 	if (a==e && e==g && b==c && c==d && d==f && f==h && h==i && e==0){
 		//cout << "Left" << endl;
-		fill_gate(x,y);
+		fill_box(x,y,gate_index);
+	}
+}
+void search_for_cross(int x, int y){
+	auto z = circuit_details;
+	int a = z[x-1][y-1], b = z[x][y-1], c = z[x+1][y-1];
+	int d = z[x-1][y],   e = z[x][y],   f = z[x+1][y];
+	int g = z[x-1][y+1], h = z[x][y+1], i = z[x+1][y+1];
+	if (a==c && c==e && e==g && g==i && b==d && d==f && f==h && e==0){
+		fill_box(x,y, cross_index);
 	}
 }
 
@@ -126,6 +136,13 @@ int main()
 		}
 	}
 	
+	// find crosses
+	for (int y=1; y<sprite_size.y-1; y++){
+		for (int x=1; x<sprite_size.x-1; x++){
+			search_for_cross(x,y);
+		}
+	}
+	
 	// find wires
 	for (int y=0; y<sprite_size.y; y++){
 		for (int x=0; x<sprite_size.x; x++){
@@ -149,8 +166,11 @@ int main()
 			if (circuit_details[x][y]>9 && circuit_details[x][y]<50){
 				raw_circuit.setPixel(x,y, sf::Color::Red);
 			}
-			if (circuit_details[x][y]>49){
+			if (circuit_details[x][y]>49 && circuit_details[x][y]<150){
 				raw_circuit.setPixel(x,y, sf::Color::Green);
+			}
+			if (circuit_details[x][y]>149){
+				raw_circuit.setPixel(x,y, sf::Color::Yellow);
 			}
 		}
 	}
