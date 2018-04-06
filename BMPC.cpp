@@ -11,15 +11,37 @@
  * i already completed all the displays and its 176 lines of c++ with comments included, i'll invent
  * my own logic instead :D
  * */
+ 
+ /* Issues
+  * the wire-gate-cross index is stupid, make a better version [done: changed the code]
+  * decide how to store the data, (ex. wires should hold their childs to be updated later
+  * and two lists of going to and coming from)
+  * Two crosses dont work together(fix it) [done]
+  * Problem with non-square images
+  * cant open large images, i get an error
+  * */
 
 #include <iostream>
 #include <cstdio>
 #include <vector>
 #include <chrono>
+#include <algorithm>
 
 #include <SFML/Graphics.hpp>
 
 using namespace std;
+
+
+// Structures --------------------------
+struct wire{
+	vector<vector<int>> parts;
+	bool in = false;
+	bool out = false;
+	bool find(int x, int y){
+		return std::find(parts.begin(), parts.end(), vector<int>{x,y}) != parts.end();
+	}
+};
+// End Of Structures -------------------
 
 // Constants ---------------------------
 
@@ -29,7 +51,6 @@ const int height = 600;
 
 // Scale display by zoom_factor amount
 float zoom_factor = 1.5;
-
 // End Of Constants --------------------
 
 sf::Texture circuit_texture;
@@ -43,73 +64,89 @@ int wire_index = 10;
 int gate_index = 50;
 int cross_index = 150;
 
-void fill_box(int x, int y, int& with){
-	for (int vy=y-1; vy<=y+1; vy++){
-		for (int vx=x-1; vx<=x+1; vx++){
-			if (circuit_details[vx][vy]==1){
-				circuit_details[vx][vy]=with;
+vector<wire> wires;
+
+wire empty_wire;
+
+// Functions
+void find_wires(int x, int y, bool global_call=true, wire &w=empty_wire){
+	if (global_call){
+		wire this_wire;
+		find_wires(x,y, false, this_wire);
+		wires.push_back(this_wire);
+	}else{
+		if (x>0 and x<circuit_details[0].size()){
+			if (y>0 and y<circuit_details.size()){
+				if (circuit_details[x][y]==1){
+					w.parts.push_back({x,y});
+					circuit_details[x][y]=2;
+					// search neighbours
+					find_wires(x+1, y  , false, w);
+					find_wires(x-1, y  , false, w);
+					find_wires(x  , y+1, false, w);
+					find_wires(x  , y-1, false, w);
+				}
 			}
 		}
 	}
-	with++;
 }
-void search_for_gate(int x, int y){
-	auto z = circuit_details;
-	int a = z[x-1][y-1], b = z[x][y-1], c = z[x+1][y-1];
-	int d = z[x-1][y],   e = z[x][y],   f = z[x+1][y];
-	int g = z[x-1][y+1], h = z[x][y+1], i = z[x+1][y+1];
-	if (a==e && e==c && b==d && d==f && f==g && g==h && h==i && e==0){
-		//cout << "Up" << endl;
-		fill_box(x,y,gate_index);
-	}
-	if (c==e && e==i && a==b && b==d && d==f && f==g && g==h && e==0){
-		//cout << "Right" << endl;
-		fill_box(x,y,gate_index);
-	}
-	if (a==b && b==c && c==d && d==f && f==h && e==g && g==i && e==0){
-		//cout << "Down" << endl;
-		fill_box(x,y,gate_index);
-	}
-	if (a==e && e==g && b==c && c==d && d==f && f==h && h==i && e==0){
-		//cout << "Left" << endl;
-		fill_box(x,y,gate_index);
-	}
-}
-void search_for_cross(int x, int y){
-	auto z = circuit_details;
-	int a = z[x-1][y-1], b = z[x][y-1], c = z[x+1][y-1];
-	int d = z[x-1][y],   e = z[x][y],   f = z[x+1][y];
-	int g = z[x-1][y+1], h = z[x][y+1], i = z[x+1][y+1];
-	if (a==c && c==e && e==g && g==i && b==d && d==f && f==h && e==0){
-		fill_box(x,y, cross_index);
+
+void find_wire_cross(int x, int y){
+	auto &c = circuit_details;
+	int r1 = c[x-1][y-1]*100 + c[x][y-1]*10 + c[x+1][y-1];
+	int r2 = c[x-1][y]*100 + c[x][y]*10 + c[x+1][y];
+	int r3 = c[x-1][y+1]*100 + c[x][y+1]*10 + c[x+1][y+1];
+	if (r1==r3 and r1==20 and r2==202){
+		// for debugging
+		c[x-1][y]   = 3;
+		c[x+1][y]   = 3;
+		c[x  ][y-1] = 3;
+		c[x  ][y+1] = 3;
+		
+		// fixing the wireings
+		int left,right,up,down;
+		int found = 0;
+		for (int i=0; i<wires.size(); i++){
+			auto this_wire = wires[i];
+			if (this_wire.find(x-1,y)){
+				left = i;
+				found++;
+			}else if (this_wire.find(x+1,y)){
+				right = i;
+				found++;
+			}
+			if (this_wire.find(x,y-1)){
+				up = i;
+				found++;
+			}else if (this_wire.find(x,y+1)){
+				down = i;
+				found++;
+			}
+			if (found==4) break;
+		}
+		if (found==4){
+			wires[left].parts.insert(wires[left].parts.end(), wires[right].parts.begin(), wires[right].parts.end());
+			wires[up].parts.insert(wires[up].parts.end(), wires[down].parts.begin(), wires[down].parts.end());
+			if (down>right){
+				wires.erase(wires.begin()+down);
+				wires.erase(wires.begin()+right);
+			}else{
+				wires.erase(wires.begin()+right);
+				wires.erase(wires.begin()+down);
+			}
+		}else{
+			cout << "ERROR: found a wire cross without finding the four neighbouring wires" << endl;
+		}
 	}
 }
 
-void occupy_it(int x, int y,  bool recursive=false){
-	circuit_details[x][y] = wire_index;
-	if (x>0)
-		if (circuit_details[x-1][y]==1)
-			occupy_it(x-1,y , true);
-	if (x<sprite_size.x-1)
-		if (circuit_details[x+1][y]==1)
-			occupy_it(x+1,y , true);
-	if (y>0)
-		if (circuit_details[x][y-1]==1)
-			occupy_it(x,y-1 , true);
-	if (y<sprite_size.y-1)
-		if (circuit_details[x][y+1]==1)
-			occupy_it(x,y+1 , true);
-	if (!recursive){
-		wire_index++;
-	}
-}
 int main()
 {
 	sf::RenderWindow window(sf::VideoMode(width, height), "Bitmap Logic Simulator Clone", sf::Style::Titlebar | sf::Style::Close);
 	window.setFramerateLimit(30);
 	
 	sf::Image raw_circuit;
-	if (!raw_circuit.loadFromFile("Circuit.bmp")){
+	if (!raw_circuit.loadFromFile("Circuit3.bmp")){
 		cout << "failed to load image" << endl;
 	}else{
 		cout << "image loaded yay" << endl;
@@ -129,56 +166,54 @@ int main()
 		}
 	}
 	
-	// find gates
-	for (int y=1; y<sprite_size.y-1; y++){
-		for (int x=1; x<sprite_size.x-1; x++){
-			search_for_gate(x,y);
-		}
-	}
-	
-	// find crosses
-	for (int y=1; y<sprite_size.y-1; y++){
-		for (int x=1; x<sprite_size.x-1; x++){
-			search_for_cross(x,y);
-		}
-	}
 	
 	// find wires
 	for (int y=0; y<sprite_size.y; y++){
 		for (int x=0; x<sprite_size.x; x++){
 			if (circuit_details[x][y]==1){
-				occupy_it(x,y);
+				find_wires(x,y);
 			}
 		}	
 	}
 	
-	// print the circuit data structure
-	for (int y=0; y<sprite_size.y; y++){
-		for (int x=0; x<sprite_size.x; x++){
-			printf("%2d ", circuit_details[x][y]);
-		}
-		cout << endl;
+	// find wire crosses and connect them
+	for (int y=1; y<sprite_size.y-1; y++){
+		for (int x=1; x<sprite_size.x-1; x++){
+			if (circuit_details[x][y]==0){
+				find_wire_cross(x,y);
+			}
+		}	
 	}
+	
+	
+	// print the circuit data structure
+//	for (int y=0; y<sprite_size.y; y++){
+//		for (int x=0; x<sprite_size.x; x++){
+//			printf("%1d ", circuit_details[x][y]);
+//		}
+//		cout << endl;
+//	}
+	
 	
 	// temp
 	for (int y=0; y<sprite_size.y; y++){
 		for (int x=0; x<sprite_size.x; x++){
-			if (circuit_details[x][y]>9 && circuit_details[x][y]<50){
-				raw_circuit.setPixel(x,y, sf::Color::Red);
+			if (circuit_details[x][y]==1){
+				raw_circuit.setPixel(x,y, sf::Color::Blue);
 			}
-			if (circuit_details[x][y]>49 && circuit_details[x][y]<150){
+			if (circuit_details[x][y]==2){
 				raw_circuit.setPixel(x,y, sf::Color::Green);
 			}
-			if (circuit_details[x][y]>149){
-				raw_circuit.setPixel(x,y, sf::Color::Yellow);
+			if (circuit_details[x][y]==3){
+				raw_circuit.setPixel(x,y, sf::Color::Cyan);
 			}
 		}
 	}
 	
-	
 	bool drag = false;
 	int dragX,dragY;
 	bool pressed=false;
+	
 	while (window.isOpen()){
 		circuit_texture.loadFromImage(raw_circuit);
 		circuit_sprite.setTexture(circuit_texture);
