@@ -45,6 +45,12 @@ struct wire{
 		return std::find(parts.begin(), parts.end(), vector<int>{x,y}) != parts.end();
 	}
 };
+
+struct gate{
+	vector<vector<int>> parts;
+	int input_wire_index;
+	int output_wire_index;
+};
 // End Of Structures -------------------
 
 // Constants ---------------------------
@@ -64,6 +70,7 @@ sf::Vector2u sprite_size;
 vector<vector<int>> circuit_details;
 
 vector<wire> wires;
+vector<gate> gates;
 
 wire empty_wire;
 
@@ -89,33 +96,23 @@ void find_wires(int x, int y, bool global_call=true, wire &w=empty_wire){
 		}
 	}
 }
-int w1=0,w2=0,w3=0,w4=0;
 void find_wire_cross(int x, int y){
 	auto &c = circuit_details;
 	int r1 = c[x-1][y-1]*100 + c[x][y-1]*10 + c[x+1][y-1];
-	int r2 = c[x-1][y]*100 + c[x][y]*10 + c[x+1][y];
+	int r2 = c[x-1][y  ]*100 + c[x][y  ]*10 + c[x+1][y  ];
 	int r3 = c[x-1][y+1]*100 + c[x][y+1]*10 + c[x+1][y+1];
-	w1++;
-	if ( (r1==20 or r1==30) and (r2==202 or r2==302 or r2==303) and (r3==20 or r3==30) ){
-		w2++;
-		// for debugging
-		c[x-1][y]   = 3;
-		c[x+1][y]   = 3;
-		c[x  ][y-1] = 3;
-		c[x  ][y+1] = 3;
-		
+	if ( r1==20 and r2==202 and r3==20 ){
 		// fixing the wireings
 		int left,right,up,down;
 		int found = 0;
 		for (int i=0; i<wires.size(); i++){
-			if (true){
-				double dist = sqrt( pow(wires[i].parts[0][0]-x,2) + pow(wires[i].parts[0][1]-y,2) );
-				int d = int(dist)-2-2*wires[i].parts.size();
-				if (d>0){
-					continue;
-				}
+			// Maybe compare one number instead of two (x,y) to speed it up
+			double dist = sqrt( pow(wires[i].parts[0][0]-x,2) + pow(wires[i].parts[0][1]-y,2) );
+			int d = int(dist)-2-2*wires[i].parts.size();
+			if (d>0){
+				continue;
 			}
-			w3++;
+			
 			auto this_wire = wires[i];
 			if (this_wire.find(x-1,y)){
 				left = i;
@@ -136,7 +133,6 @@ void find_wire_cross(int x, int y){
 			if (found==4) break;
 		}
 		if (found==4){
-			w4++;
 			if (left != right)
 				wires[left].parts.insert(wires[left].parts.end(), wires[right].parts.begin(), wires[right].parts.end());
 			if (up != down)
@@ -159,6 +155,70 @@ void find_wire_cross(int x, int y){
 			cout << "ERROR: found a wire cross without finding the four neighbouring wires " << found << endl;
 			cout << "Error at position: " << x << " " << y << endl;
 		}
+	}
+}
+
+void make_gate(int x, int y, int dir){
+	gate this_gate;
+	
+	// add the gate parts
+	for (int j=-1; j<=1; j++){
+		for (int i=-1; i<=1; i++){
+			if ( circuit_details[x+i][y+j] == 2 ){
+				this_gate.parts.push_back({x+i, y+j});
+			}
+		}
+	}
+	
+	for (int i=0; i<wires.size(); i++){
+		// Maybe compare one number instead of two (x,y) to speed it up
+		double dist = sqrt( pow(wires[i].parts[0][0]-x,2) + pow(wires[i].parts[0][1]-y,2) );
+		int d = int(dist)-2-2*wires[i].parts.size();
+		if (d>0){
+			continue;
+		}
+		if (dir==1){
+			if (wires[i].find(x,y-1)){
+				this_gate.output_wire_index = i;
+			}if (wires[i].find(x,y+1)){
+				this_gate.input_wire_index = i;
+			}
+		}else if (dir==2){
+			if (wires[i].find(x+1,y)){
+				this_gate.output_wire_index = i;
+			}if (wires[i].find(x-1,y)){
+				this_gate.input_wire_index = i;
+			}
+		}else if (dir==3){
+			if (wires[i].find(x,y+1)){
+				this_gate.output_wire_index = i;
+			}if (wires[i].find(x,y-1)){
+				this_gate.input_wire_index = i;
+			}
+		}else if (dir==4){
+			if (wires[i].find(x-1,y)){
+				this_gate.output_wire_index = i;
+			}if (wires[i].find(x+1,y)){
+				this_gate.input_wire_index = i;
+			}
+		}
+	}
+	gates.push_back(this_gate);
+}
+
+void find_gates(int x, int y){
+	auto &c = circuit_details;
+	int r1 = c[x-1][y-1]*100 + c[x][y-1]*10 + c[x+1][y-1];
+	int r2 = c[x-1][y  ]*100 + c[x][y  ]*10 + c[x+1][y  ];
+	int r3 = c[x-1][y+1]*100 + c[x][y+1]*10 + c[x+1][y+1];
+	if ( (r1==220) and (r2==202) and (r3==220) ){
+		make_gate(x,y, 2);
+	}else if ( r1==22 and r2==202 and r3==22 ){
+		make_gate(x,y, 4);
+	}else if ( r1==20 and r2==202 and r3==222 ){
+		make_gate(x,y, 1);
+	}else if ( r1==222 and r2==202 and r3==20 ){
+		make_gate(x,y, 3);
 	}
 }
 
@@ -200,27 +260,38 @@ int main()
 		}
 	}
 	cout << "Found " << wires.size() << " wires before calculating crosses\n";
+	
 	// find wire crosses and connect them
 	cout << "finding wire crosses:\n";
 	for (int y=1; y<sprite_size.y-1; y++){
-		printf("%d%\n", int(100*y/sprite_size.y) );
+		cout << "\b\b\b" << int(100*y/sprite_size.y) << "%"; fflush(stdout);
 		for (int x=1; x<sprite_size.x-1; x++){
 			if (circuit_details[x][y]==0){
 				find_wire_cross(x,y);
 			}
-		}	
+		}
 	}
-	cout << w1 << " " << w2 << " " << w3 << " " << w4 << endl;
-	cout << "Found " << wires.size() << " wires after calculating crosses\n";
+	cout << "\nFound " << wires.size() << " wires after calculating crosses\n";
 	
-	// print the circuit data structure
-//	for (int y=0; y<sprite_size.y; y++){
-//		for (int x=0; x<sprite_size.x; x++){
-//			printf("%1d ", circuit_details[x][y]);
-//		}
-//		cout << endl;
-//	}
 	
+	// find gates and attach the wires to them
+	cout << "finding gates:\n";
+	for (int y=1; y<sprite_size.y-1; y++){
+		cout << "\b\b\b" << int(100*y/sprite_size.y) << "%"; fflush(stdout);
+		for (int x=1; x<sprite_size.x-1; x++){
+			if (circuit_details[x][y]==0){
+				find_gates(x,y);
+			}
+		}
+	}
+	cout << "\nFound " << gates.size() << " gates\n";
+	for (auto i:gates){
+		for (auto j:i.parts){
+			circuit_details[j[0]][j[1]] = 3;
+		}
+	}
+	
+	cout << "done" << endl;
 	// temp
 	for (int y=0; y<sprite_size.y; y++){
 		for (int x=0; x<sprite_size.x; x++){
