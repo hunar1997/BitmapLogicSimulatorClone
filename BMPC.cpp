@@ -19,6 +19,9 @@
   * Two crosses dont work together(fix it) [done]
   * Problem with non-square images
   * cant open large images, i get an error
+  * clicking outside picture crashes it
+  * The wire finding and fixing function is soooo slloooooooooowwww [fixed to some extend, not great though]
+  * wires touching boundary crashes it
   * */
 
 #include <iostream>
@@ -26,6 +29,7 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <cmath>
 
 #include <SFML/Graphics.hpp>
 
@@ -59,11 +63,6 @@ sf::Vector2u sprite_size;
 
 vector<vector<int>> circuit_details;
 
-
-int wire_index = 10;
-int gate_index = 50;
-int cross_index = 150;
-
 vector<wire> wires;
 
 wire empty_wire;
@@ -90,13 +89,15 @@ void find_wires(int x, int y, bool global_call=true, wire &w=empty_wire){
 		}
 	}
 }
-
+int w1=0,w2=0,w3=0,w4=0;
 void find_wire_cross(int x, int y){
 	auto &c = circuit_details;
 	int r1 = c[x-1][y-1]*100 + c[x][y-1]*10 + c[x+1][y-1];
 	int r2 = c[x-1][y]*100 + c[x][y]*10 + c[x+1][y];
 	int r3 = c[x-1][y+1]*100 + c[x][y+1]*10 + c[x+1][y+1];
-	if (r1==r3 and r1==20 and r2==202){
+	w1++;
+	if ( (r1==20 or r1==30) and (r2==202 or r2==302 or r2==303) and (r3==20 or r3==30) ){
+		w2++;
 		// for debugging
 		c[x-1][y]   = 3;
 		c[x+1][y]   = 3;
@@ -107,35 +108,56 @@ void find_wire_cross(int x, int y){
 		int left,right,up,down;
 		int found = 0;
 		for (int i=0; i<wires.size(); i++){
+			if (true){
+				double dist = sqrt( pow(wires[i].parts[0][0]-x,2) + pow(wires[i].parts[0][1]-y,2) );
+				int d = int(dist)-2-2*wires[i].parts.size();
+				if (d>0){
+					continue;
+				}
+			}
+			w3++;
 			auto this_wire = wires[i];
 			if (this_wire.find(x-1,y)){
 				left = i;
 				found++;
-			}else if (this_wire.find(x+1,y)){
+			}
+			if (this_wire.find(x+1,y)){
 				right = i;
 				found++;
 			}
 			if (this_wire.find(x,y-1)){
 				up = i;
 				found++;
-			}else if (this_wire.find(x,y+1)){
+			}
+			if (this_wire.find(x,y+1)){
 				down = i;
 				found++;
 			}
 			if (found==4) break;
 		}
 		if (found==4){
-			wires[left].parts.insert(wires[left].parts.end(), wires[right].parts.begin(), wires[right].parts.end());
-			wires[up].parts.insert(wires[up].parts.end(), wires[down].parts.begin(), wires[down].parts.end());
-			if (down>right){
-				wires.erase(wires.begin()+down);
+			w4++;
+			if (left != right)
+				wires[left].parts.insert(wires[left].parts.end(), wires[right].parts.begin(), wires[right].parts.end());
+			if (up != down)
+				wires[up].parts.insert(wires[up].parts.end(), wires[down].parts.begin(), wires[down].parts.end());
+			if (left != right and up != down){
+				if (down>right){
+					wires.erase(wires.begin()+down);
+					wires.erase(wires.begin()+right);
+				}else{
+					wires.erase(wires.begin()+right);
+					wires.erase(wires.begin()+down);
+				}
+			}else if(left != right){
 				wires.erase(wires.begin()+right);
-			}else{
-				wires.erase(wires.begin()+right);
+			}else if(up != down){
 				wires.erase(wires.begin()+down);
 			}
+			// else all neighbour wires are the same so nothing to do
 		}else{
-			cout << "ERROR: found a wire cross without finding the four neighbouring wires" << endl;
+			cout << "ERROR: found a wire cross without finding the four neighbouring wires " << found << endl;
+			cout << "Error at position: " << x << " " << y << endl;
 		}
 	}
 }
@@ -146,6 +168,8 @@ int main()
 	window.setFramerateLimit(30);
 	
 	sf::Image raw_circuit;
+	// 8bit_cpu.bmp
+	// Circuit3.bmp
 	if (!raw_circuit.loadFromFile("Circuit3.bmp")){
 		cout << "failed to load image" << endl;
 	}else{
@@ -173,18 +197,21 @@ int main()
 			if (circuit_details[x][y]==1){
 				find_wires(x,y);
 			}
-		}	
+		}
 	}
-	
+	cout << "Found " << wires.size() << " wires before calculating crosses\n";
 	// find wire crosses and connect them
+	cout << "finding wire crosses:\n";
 	for (int y=1; y<sprite_size.y-1; y++){
+		printf("%d%\n", int(100*y/sprite_size.y) );
 		for (int x=1; x<sprite_size.x-1; x++){
 			if (circuit_details[x][y]==0){
 				find_wire_cross(x,y);
 			}
 		}	
 	}
-	
+	cout << w1 << " " << w2 << " " << w3 << " " << w4 << endl;
+	cout << "Found " << wires.size() << " wires after calculating crosses\n";
 	
 	// print the circuit data structure
 //	for (int y=0; y<sprite_size.y; y++){
@@ -193,7 +220,6 @@ int main()
 //		}
 //		cout << endl;
 //	}
-	
 	
 	// temp
 	for (int y=0; y<sprite_size.y; y++){
