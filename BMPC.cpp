@@ -21,6 +21,7 @@
   * cant open large images, i get an error
   * clicking outside picture crashes it
   * The wire finding and fixing function is soooo slloooooooooowwww [fixed to some extend, not great though]
+  * [actually adding optimization flag made it superfast]
   * wires touching boundary crashes it
   * */
 
@@ -35,19 +36,26 @@
 
 using namespace std;
 
-
+// Optimizing the speed
+int CW, CH;
+int to_one(int x, int y){
+	return y*CH+x;
+}
+vector<int> to_two(int i){
+	return {i%CW, i/CW};
+}
 // Structures --------------------------
 struct wire{
-	vector<vector<int>> parts;
+	vector<int> parts;
 	bool in = false;
 	bool out = false;
-	bool find(int x, int y){
-		return std::find(parts.begin(), parts.end(), vector<int>{x,y}) != parts.end();
+	bool find(int i){
+		return std::find(parts.begin(), parts.end(), i) != parts.end();
 	}
 };
 
 struct gate{
-	vector<vector<int>> parts;
+	vector<int> parts;
 	int input_wire_index;
 	int output_wire_index;
 };
@@ -74,6 +82,7 @@ vector<gate> gates;
 
 wire empty_wire;
 
+float tw=0, tc=0, tg=0;
 // Functions
 void find_wires(int x, int y, bool global_call=true, wire &w=empty_wire){
 	if (global_call){
@@ -84,7 +93,7 @@ void find_wires(int x, int y, bool global_call=true, wire &w=empty_wire){
 		if (x>0 and x<circuit_details[0].size()){
 			if (y>0 and y<circuit_details.size()){
 				if (circuit_details[x][y]==1){
-					w.parts.push_back({x,y});
+					w.parts.push_back(to_one(x,y));
 					circuit_details[x][y]=2;
 					// search neighbours
 					find_wires(x+1, y  , false, w);
@@ -106,27 +115,27 @@ void find_wire_cross(int x, int y){
 		int left,right,up,down;
 		int found = 0;
 		for (int i=0; i<wires.size(); i++){
-			// Maybe compare one number instead of two (x,y) to speed it up
-			double dist = sqrt( pow(wires[i].parts[0][0]-x,2) + pow(wires[i].parts[0][1]-y,2) );
+			// Maybe compare one number instead of two (x,y) to speed it up [im doing this right now]
+			double dist = sqrt( pow(to_two(wires[i].parts[0])[0]-x,2) + pow(to_two(wires[i].parts[0])[1]-y,2) );
 			int d = int(dist)-2-2*wires[i].parts.size();
 			if (d>0){
 				continue;
 			}
 			
 			auto this_wire = wires[i];
-			if (this_wire.find(x-1,y)){
+			if (this_wire.find(to_one(x-1,y))){
 				left = i;
 				found++;
 			}
-			if (this_wire.find(x+1,y)){
+			if (this_wire.find(to_one(x+1,y))){
 				right = i;
 				found++;
 			}
-			if (this_wire.find(x,y-1)){
+			if (this_wire.find(to_one(x,y-1))){
 				up = i;
 				found++;
 			}
-			if (this_wire.find(x,y+1)){
+			if (this_wire.find(to_one(x,y+1))){
 				down = i;
 				found++;
 			}
@@ -165,40 +174,40 @@ void make_gate(int x, int y, int dir){
 	for (int j=-1; j<=1; j++){
 		for (int i=-1; i<=1; i++){
 			if ( circuit_details[x+i][y+j] == 2 ){
-				this_gate.parts.push_back({x+i, y+j});
+				this_gate.parts.push_back(to_one(x+i, y+j));
 			}
 		}
 	}
 	
 	for (int i=0; i<wires.size(); i++){
 		// Maybe compare one number instead of two (x,y) to speed it up
-		double dist = sqrt( pow(wires[i].parts[0][0]-x,2) + pow(wires[i].parts[0][1]-y,2) );
+		double dist = sqrt( pow(to_two(wires[i].parts[0])[0]-x,2) + pow(to_two(wires[i].parts[0])[1]-y,2) );
 		int d = int(dist)-2-2*wires[i].parts.size();
 		if (d>0){
 			continue;
 		}
 		if (dir==1){
-			if (wires[i].find(x,y-1)){
+			if (wires[i].find(to_one(x,y-1))){
 				this_gate.output_wire_index = i;
-			}if (wires[i].find(x,y+1)){
+			}if (wires[i].find(to_one(x,y+1))){
 				this_gate.input_wire_index = i;
 			}
 		}else if (dir==2){
-			if (wires[i].find(x+1,y)){
+			if (wires[i].find(to_one(x+1,y))){
 				this_gate.output_wire_index = i;
-			}if (wires[i].find(x-1,y)){
+			}if (wires[i].find(to_one(x-1,y))){
 				this_gate.input_wire_index = i;
 			}
 		}else if (dir==3){
-			if (wires[i].find(x,y+1)){
+			if (wires[i].find(to_one(x,y+1))){
 				this_gate.output_wire_index = i;
-			}if (wires[i].find(x,y-1)){
+			}if (wires[i].find(to_one(x,y-1))){
 				this_gate.input_wire_index = i;
 			}
 		}else if (dir==4){
-			if (wires[i].find(x-1,y)){
+			if (wires[i].find(to_one(x-1,y))){
 				this_gate.output_wire_index = i;
-			}if (wires[i].find(x+1,y)){
+			}if (wires[i].find(to_one(x+1,y))){
 				this_gate.input_wire_index = i;
 			}
 		}
@@ -225,12 +234,12 @@ void find_gates(int x, int y){
 int main()
 {
 	sf::RenderWindow window(sf::VideoMode(width, height), "Bitmap Logic Simulator Clone", sf::Style::Titlebar | sf::Style::Close);
-	window.setFramerateLimit(30);
-	
+	window.setFramerateLimit(10);
+
 	sf::Image raw_circuit;
 	// 8bit_cpu.bmp
 	// Circuit3.bmp
-	if (!raw_circuit.loadFromFile("Circuit3.bmp")){
+	if (!raw_circuit.loadFromFile("Circuit2.bmp")){
 		cout << "failed to load image" << endl;
 	}else{
 		cout << "image loaded yay" << endl;
@@ -248,6 +257,8 @@ int main()
 			}
 			circuit_details.push_back(this_y);
 		}
+		CW = circuit_details.size();
+		CH = circuit_details[0].size();
 	}
 	
 	
@@ -287,7 +298,7 @@ int main()
 	cout << "\nFound " << gates.size() << " gates\n";
 	for (auto i:gates){
 		for (auto j:i.parts){
-			circuit_details[j[0]][j[1]] = 3;
+			circuit_details[to_two(j)[0]][to_two(j)[1]] = 3;
 		}
 	}
 	
@@ -309,9 +320,25 @@ int main()
 	
 	bool drag = false;
 	int dragX,dragY;
-	bool pressed=false;
+	bool Lpressed=false;
+	bool Rpressed=false;
 	
 	while (window.isOpen()){
+		// Do the game cycle
+			//update wires
+				for (int i=0; i<wires.size(); i++){
+					wires[i].out = wires[i].in;
+					wires[i].in = false;
+					// Change color of wire parts (todo: dont change if not changed)
+					for (int j=0; j<wires[i].parts.size(); j++){
+						auto xy = to_two(wires[i].parts[j]);
+						sf::Color color(128,128,128);
+						if (wires[i].out) color = {255,255,255};
+						raw_circuit.setPixel(xy[0],xy[1], color);
+					}
+				}
+			//update gates
+		
 		circuit_texture.loadFromImage(raw_circuit);
 		circuit_sprite.setTexture(circuit_texture);
 		
@@ -369,7 +396,9 @@ int main()
 					drag = true;
 				}
 				if (event.mouseButton.button==0){
-					pressed=true;
+					Lpressed=true;
+				}else if (event.mouseButton.button==1){
+					Rpressed=true;
 				}
 			}
 			if (event.type == sf::Event::MouseButtonReleased){
@@ -388,7 +417,9 @@ int main()
 					circuit_sprite.setPosition(width/2, height/2);
 				}
 				if (event.mouseButton.button==0){
-					pressed=false;
+					Lpressed=false;
+				}else if (event.mouseButton.button==1){
+					Rpressed=false;
 				}
 			}
 			if (drag){
@@ -397,19 +428,25 @@ int main()
 					sf::Mouse::getPosition().y+dragY
 				);
 			}
-			if (pressed){
+			if (Lpressed or Rpressed){
 				float scale = circuit_sprite.getScale().x;
 				float ax = sf::Mouse::getPosition(window).x;
 				float ay = sf::Mouse::getPosition(window).y;
 				float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
 				float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
 				float bx = ax-cx;  float by = ay-cy;
-				float rx = bx/scale;  float ry = by/scale;
+				int rx = bx/scale;  int ry = by/scale;
 				
-				raw_circuit.setPixel(rx,ry,sf::Color::Red);
+				if (Rpressed){
+					// for some reason (auto i:wires) doesnt work :/
+					for (int i=0; i<wires.size(); i++){
+						if (wires[i].find(to_one(rx,ry))){
+							wires[i].in = not(wires[i].in);
+						}
+					}
+				}
 			}
 		}
-
 		
 		window.clear();
 		window.draw(circuit_sprite);
@@ -420,5 +457,4 @@ int main()
 	
 	return 0;
 }
-
 
