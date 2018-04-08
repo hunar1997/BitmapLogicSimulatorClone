@@ -73,7 +73,7 @@ struct gate{
 const int width = 800;
 const int height = 600;
 // simulation stuff
-int s_fps = 20;		// simulation per frame
+int s_fps = 10;		// simulation per frame
 // Scale display by zoom_factor amount
 float zoom_factor = 1.5;
 // End Of Constants --------------------
@@ -230,6 +230,7 @@ void find_gates(int x, int y){
 }
 
 vector<int> manualy_powered;
+int powered_by_click=-1;
 
 int main()
 {
@@ -319,14 +320,15 @@ int main()
 	bool drag = false;
 	int dragX,dragY;
 	
-	bool pressed=false;
-	
 	
 	while (window.isOpen()){
 		// Do the game cycle
 		for (int loop=0; loop<s_fps; loop++){
 			for (int i=0; i<manualy_powered.size(); i++){
 				wires[manualy_powered[i]].in = true;
+			}
+			if(powered_by_click != -1){
+				wires[powered_by_click].in = true;
 			}
 			//update wires
 				for (int i=0; i<wires.size(); i++){
@@ -394,6 +396,14 @@ int main()
 				}
 			}
 			
+			float scale = circuit_sprite.getScale().x;
+			float ax = sf::Mouse::getPosition(window).x;
+			float ay = sf::Mouse::getPosition(window).y;
+			float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
+			float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
+			float bx = ax-cx;  float by = ay-cy;
+			int rx = bx/scale;  int ry = by/scale;
+			
 			if (event.type == sf::Event::MouseButtonPressed){
 				if (event.mouseButton.button==2){
 					if (!drag){
@@ -403,7 +413,21 @@ int main()
 					drag = true;
 				}
 				if (event.mouseButton.button==0){
-					pressed=true;
+					for (int i=0; i<wires.size(); i++){
+						if (wires[i].find(to_one(rx,ry))){
+							if ( not found_it(manualy_powered, i) ){
+								powered_by_click = i;
+							}else{
+								for (int f=0; f<manualy_powered.size(); f++){
+									if ( manualy_powered[f]==i ){
+										powered_by_click = -1;
+										break;
+									}
+								}
+							}
+							break;
+						}
+					}
 				}
 			}
 			if (event.type == sf::Event::MouseButtonReleased){
@@ -422,17 +446,11 @@ int main()
 					circuit_sprite.setPosition(width/2, height/2);
 				}
 				if (event.mouseButton.button==0){
-					pressed=false;
+					powered_by_click = -1;
 				}else if (event.mouseButton.button==1){
 					
 					// right click handling -------------------------
-					float scale = circuit_sprite.getScale().x;
-					float ax = sf::Mouse::getPosition(window).x;
-					float ay = sf::Mouse::getPosition(window).y;
-					float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
-					float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
-					float bx = ax-cx;  float by = ay-cy;
-					int rx = bx/scale;  int ry = by/scale;
+
 				
 					// for some reason (auto i:wires) doesnt work :/
 					for (int i=0; i<wires.size(); i++){
@@ -460,9 +478,6 @@ int main()
 					sf::Mouse::getPosition().x+dragX,
 					sf::Mouse::getPosition().y+dragY
 				);
-			}
-			if (pressed){
-				
 			}
 		}
 		
