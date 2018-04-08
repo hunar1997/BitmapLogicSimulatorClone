@@ -15,7 +15,7 @@
  /* Issues
   * the wire-gate-cross index is stupid, make a better version [done: changed the code]
   * decide how to store the data, (ex. wires should hold their childs to be updated later
-  * and two lists of going to and coming from)
+  * and two lists of going to and coming from)[done]
   * Two crosses dont work together(fix it) [done]
   * Problem with non-square images
   * cant open large images, i get an error
@@ -23,6 +23,8 @@
   * The wire finding and fixing function is soooo slloooooooooowwww [fixed to some extend, not great though]
   * [actually adding optimization flag made it superfast]
   * wires touching boundary crashes it
+  * crashes when a wire is at boundary
+  * the wires filcker due to all off them being powered at the same time
   * */
 
 #include <iostream>
@@ -31,6 +33,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include <SFML/Graphics.hpp>
 
@@ -38,11 +41,14 @@ using namespace std;
 
 // Optimizing the speed
 int CW, CH;
-int to_one(int x, int y){
+inline int to_one(int x, int y){
 	return y*CH+x;
 }
-vector<int> to_two(int i){
+inline vector<int> to_two(int i){
 	return {i%CW, i/CW};
+}
+inline bool found_it(vector<int> l, int i){
+	return std::find(l.begin(), l.end(), i) != l.end();
 }
 // Structures --------------------------
 struct wire{
@@ -50,7 +56,7 @@ struct wire{
 	bool in = false;
 	bool out = false;
 	bool find(int i){
-		return std::find(parts.begin(), parts.end(), i) != parts.end();
+		return found_it(parts, i);
 	}
 };
 
@@ -66,7 +72,8 @@ struct gate{
 // screen size
 const int width = 800;
 const int height = 600;
-
+// simulation stuff
+int s_fps = 20;		// simulation per frame
 // Scale display by zoom_factor amount
 float zoom_factor = 1.5;
 // End Of Constants --------------------
@@ -222,18 +229,23 @@ void find_gates(int x, int y){
 	}
 }
 
+vector<int> manualy_powered;
+
 int main()
 {
+	time_t t;
+	srand((unsigned) time(&t));
+	
 	sf::RenderWindow window(sf::VideoMode(width, height), "Bitmap Logic Simulator Clone", sf::Style::Titlebar | sf::Style::Close);
-	window.setFramerateLimit(10);
+	window.setFramerateLimit(30);
 
 	sf::Image raw_circuit;
 	// 8bit_cpu.bmp
 	// Circuit3.bmp
-	if (!raw_circuit.loadFromFile("Circuit2.bmp")){
-		cout << "failed to load image" << endl;
+	if (!raw_circuit.loadFromFile("8bit_cpu.bmp")){
+		cout << "Failed to load image" << endl;
 	}else{
-		cout << "image loaded yay" << endl;
+		cout << "Image loaded yay" << endl;
 		circuit_texture.loadFromImage(raw_circuit);
 		circuit_sprite.setTexture(circuit_texture);
 		sprite_size = circuit_texture.getSize();
@@ -244,7 +256,13 @@ int main()
 			vector<int> this_y;
 			for (int x=0; x<sprite_size.x; x++){
 				// i still don't know why it should be (y,x) instead of (x,y)
-				this_y.push_back( (raw_circuit.getPixel(y,x)==sf::Color::White)?1:0 );
+				auto c = raw_circuit.getPixel(y,x);
+				if (c.r>223 or c.g>223 or c.b>223){
+					this_y.push_back(1);
+				}else{
+					this_y.push_back(0);
+				}
+				
 			}
 			circuit_details.push_back(this_y);
 		}
@@ -288,29 +306,28 @@ int main()
 	}
 	cout << "\nFound " << gates.size() << " gates\n";
 	
-	cout << "done" << endl;
-	// temp
-	for (int y=0; y<sprite_size.y; y++){
-		for (int x=0; x<sprite_size.x; x++){
-			if (circuit_details[x][y]==1){
-				raw_circuit.setPixel(x,y, sf::Color::Blue);
-			}
-			if (circuit_details[x][y]==2){
-				raw_circuit.setPixel(x,y, sf::Color::Green);
-			}
-			if (circuit_details[x][y]==3){
-				raw_circuit.setPixel(x,y, sf::Color::Cyan);
-			}
-		}
-	}
+	
+	
+	// fixing the flickering window, adds random state to every wire[doesnt work as good as i imagened]
+	for (int i=0; i<wires.size(); i++)
+		wires[i].in = rand()%2;
+
+	
+	cout << "Done" << endl;
+	
 	
 	bool drag = false;
 	int dragX,dragY;
-	bool Lpressed=false;
-	bool Rpressed=false;
+	
+	bool pressed=false;
+	
 	
 	while (window.isOpen()){
 		// Do the game cycle
+		for (int loop=0; loop<s_fps; loop++){
+			for (int i=0; i<manualy_powered.size(); i++){
+				wires[manualy_powered[i]].in = true;
+			}
 			//update wires
 				for (int i=0; i<wires.size(); i++){
 					wires[i].out = wires[i].in;
@@ -324,10 +341,14 @@ int main()
 					}
 				}
 			//update gates
+				for (int i=0; i<gates.size(); i++){
+					if (wires[gates[i].output_wire_index].in==false)
+						wires[gates[i].output_wire_index].in = not( wires[gates[i].input_wire_index].out );
+				}
 		
 		circuit_texture.loadFromImage(raw_circuit);
 		circuit_sprite.setTexture(circuit_texture);
-		
+		}
 		sf::Event event;
 		while (window.pollEvent(event)){
 			if (event.type == sf::Event::Closed){
@@ -382,9 +403,7 @@ int main()
 					drag = true;
 				}
 				if (event.mouseButton.button==0){
-					Lpressed=true;
-				}else if (event.mouseButton.button==1){
-					Rpressed=true;
+					pressed=true;
 				}
 			}
 			if (event.type == sf::Event::MouseButtonReleased){
@@ -403,9 +422,37 @@ int main()
 					circuit_sprite.setPosition(width/2, height/2);
 				}
 				if (event.mouseButton.button==0){
-					Lpressed=false;
+					pressed=false;
 				}else if (event.mouseButton.button==1){
-					Rpressed=false;
+					
+					// right click handling -------------------------
+					float scale = circuit_sprite.getScale().x;
+					float ax = sf::Mouse::getPosition(window).x;
+					float ay = sf::Mouse::getPosition(window).y;
+					float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
+					float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
+					float bx = ax-cx;  float by = ay-cy;
+					int rx = bx/scale;  int ry = by/scale;
+				
+					// for some reason (auto i:wires) doesnt work :/
+					for (int i=0; i<wires.size(); i++){
+						if (wires[i].find(to_one(rx,ry))){
+							//wires[i].in = not(wires[i].in);
+			
+							if ( not found_it(manualy_powered, i) ){
+								manualy_powered.push_back(i);
+							}else{
+								for (int f=0; f<manualy_powered.size(); f++){
+									if ( manualy_powered[f]==i ){
+										manualy_powered.erase(manualy_powered.begin()+f);
+										break;
+									}
+								}
+							}
+							break;
+						}
+					}
+					// end of right click handing -------------------
 				}
 			}
 			if (drag){
@@ -414,23 +461,8 @@ int main()
 					sf::Mouse::getPosition().y+dragY
 				);
 			}
-			if (Lpressed or Rpressed){
-				float scale = circuit_sprite.getScale().x;
-				float ax = sf::Mouse::getPosition(window).x;
-				float ay = sf::Mouse::getPosition(window).y;
-				float cx = circuit_sprite.getPosition().x - circuit_sprite.getOrigin().x*scale;
-				float cy = circuit_sprite.getPosition().y - circuit_sprite.getOrigin().y*scale;
-				float bx = ax-cx;  float by = ay-cy;
-				int rx = bx/scale;  int ry = by/scale;
+			if (pressed){
 				
-				if (Rpressed){
-					// for some reason (auto i:wires) doesnt work :/
-					for (int i=0; i<wires.size(); i++){
-						if (wires[i].find(to_one(rx,ry))){
-							wires[i].in = not(wires[i].in);
-						}
-					}
-				}
 			}
 		}
 		
