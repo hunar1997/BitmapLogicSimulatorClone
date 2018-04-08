@@ -55,7 +55,7 @@ struct wire{
 };
 
 struct gate{
-	vector<int> parts;
+	//vector<int> parts;
 	int input_wire_index;
 	int output_wire_index;
 };
@@ -169,15 +169,6 @@ void find_wire_cross(int x, int y){
 
 void make_gate(int x, int y, int dir){
 	gate this_gate;
-	
-	// add the gate parts
-	for (int j=-1; j<=1; j++){
-		for (int i=-1; i<=1; i++){
-			if ( circuit_details[x+i][y+j] == 2 ){
-				this_gate.parts.push_back(to_one(x+i, y+j));
-			}
-		}
-	}
 	
 	for (int i=0; i<wires.size(); i++){
 		// Maybe compare one number instead of two (x,y) to speed it up
@@ -296,11 +287,6 @@ int main()
 		}
 	}
 	cout << "\nFound " << gates.size() << " gates\n";
-	for (auto i:gates){
-		for (auto j:i.parts){
-			circuit_details[to_two(j)[0]][to_two(j)[1]] = 3;
-		}
-	}
 	
 	cout << "done" << endl;
 	// temp
