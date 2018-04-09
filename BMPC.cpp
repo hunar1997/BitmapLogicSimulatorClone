@@ -11,21 +11,6 @@
  * i already completed all the displays and its 176 lines of c++ with comments included, i'll invent
  * my own logic instead :D
  * */
- 
- /* Issues
-  * the wire-gate-cross index is stupid, make a better version [done: changed the code]
-  * decide how to store the data, (ex. wires should hold their childs to be updated later
-  * and two lists of going to and coming from)[done]
-  * Two crosses dont work together(fix it) [done]
-  * Problem with non-square images
-  * cant open large images, i get an error
-  * clicking outside picture crashes it
-  * The wire finding and fixing function is soooo slloooooooooowwww [fixed to some extend, not great though]
-  * [actually adding optimization flag made it superfast]
-  * wires touching boundary crashes it
-  * crashes when a wire is at boundary
-  * the wires filcker due to all off them being powered at the same time
-  * */
 
 #include <iostream>
 #include <cstdio>
@@ -73,7 +58,7 @@ struct gate{
 const int width = 800;
 const int height = 600;
 // simulation stuff
-int s_fps = 10;		// simulation per frame
+int s_fps = 4;		// simulation per frame
 // Scale display by zoom_factor amount
 float zoom_factor = 1.5;
 // End Of Constants --------------------
