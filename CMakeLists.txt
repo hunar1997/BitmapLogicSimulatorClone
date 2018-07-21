@@ -7,8 +7,4 @@ add_executable(BitmapLogicSimulatorClone BMPC.cpp)
 
 set(CMAKE_CXX_FLAGS "-O3")
 
-find_package(SFML REQUIRED system window graphics)
-if (SFML_FOUND)
-    include_directories(${SFML_INCLUDE_DIR})
-    target_link_libraries(BitmapLogicSimulatorClone ${SFML_LIBRARIES})
-endif()
+target_link_libraries(Junk sfml-graphics sfml-window sfml-system)
